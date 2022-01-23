@@ -1,0 +1,15 @@
+{
+  "category.autoelytrapanic.main": "Auto Elytra Panic",
+  "key.autoelytrapanic.toggle": "Toggle Enabled",
+  "key.autoelytrapanic.cancel": "Cancel / Stop Panic",
+  "message.autoelytrapanic.enabled": "Auto Elytra Panic is now §a§oEnabled",
+  "message.autoelytrapanic.disabled": "Auto Elytra Panic is now §c§oDisabled",
+  "text.autoconfig.autoelytrapanic.title": "Auto Elytra Panic Configuration",
+  "text.autoconfig.autoelytrapanic.option.isEnabled": "Enabled",
+  "text.autoconfig.autoelytrapanic.option.panicFallDistance": "Panic Fall Distance",
+  "text.autoconfig.autoelytrapanic.option.activationPitch": "Activation Pitch",
+  "text.autoconfig.autoelytrapanic.option.additiveYaw": "Additive Yaw",
+  "text.autoconfig.autoelytrapanic.option.chatMessageOnActivate": "Chat message on activate",
+  "message.autoelytrapanic.onActivate": "Auto Elytra Panic activated",
+  "message.autoelytrapanic.cancelled": "Auto Elytra Panic cancelled"
+}
