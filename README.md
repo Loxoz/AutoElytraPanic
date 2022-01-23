@@ -5,3 +5,5 @@ Will activate elytras and make you spin automagically when you are falling from 
 👉🏻 *Requires **Fabric API** and **Cloth Config**.*
 
 **Mod menu** is recommended to configure the mod.
+
+preview: https://youtu.be/c6JsP-oEdCE
