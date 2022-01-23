@@ -7,6 +7,6 @@ import me.shedaniel.autoconfig.AutoConfig;
 public class AutoElytraPanicModMenu implements ModMenuApi {
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
-        return parent -> AutoConfig.getConfigScreen(Config.class, parent).get();
+        return parent -> AutoConfig.getConfigScreen(ModConfig.class, parent).get();
     }
 }

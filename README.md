@@ -6,4 +6,6 @@ Will activate elytras and make you spin automagically when you are falling from 
 
 **Mod menu** is recommended to configure the mod.
 
-preview: https://youtu.be/c6JsP-oEdCE
+### Preview
+
+[![Video thumbnail](https://i.ytimg.com/vi/c6JsP-oEdCE/hqdefault.jpg)](https://youtu.be/c6JsP-oEdCE)
