@@ -1,6 +1,6 @@
 # Auto Elytra Panic
 
-→ download on [Curseforge](https://www.curseforge.com/minecraft/mc-mods/autoelytrapanic#c1)
+→ download on [Curseforge](https://www.curseforge.com/minecraft/mc-mods/autoelytrapanic)
 
 Will activate elytras and make you spin automagically when you are falling from too high to avoid dying.  
 Only made this thing for fun.
