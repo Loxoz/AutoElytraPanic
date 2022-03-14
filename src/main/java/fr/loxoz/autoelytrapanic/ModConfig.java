@@ -4,7 +4,7 @@ import me.shedaniel.autoconfig.ConfigData;
 import me.shedaniel.autoconfig.annotation.Config;
 import me.shedaniel.autoconfig.annotation.ConfigEntry;
 
-@Config(name = AutoElytraPanic.MODKEY)
+@Config(name = AutoElytraPanic.MOD_ID)
 public class ModConfig implements ConfigData {
     @ConfigEntry.Gui.Tooltip()
     boolean isEnabled = false;
@@ -16,6 +16,8 @@ public class ModConfig implements ConfigData {
     float additiveYaw = 45;
     @ConfigEntry.Gui.Tooltip()
     boolean restoreView = true;
+    @ConfigEntry.Gui.Tooltip()
+    boolean ignoreIfDamaged = true;
     @ConfigEntry.Gui.Tooltip()
     boolean chatMessageOnActivate = false;
 }
