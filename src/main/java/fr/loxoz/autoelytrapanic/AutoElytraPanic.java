@@ -20,41 +20,35 @@ import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.ElytraItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.text.LiteralText;
 import net.minecraft.text.Style;
 import net.minecraft.text.TranslatableText;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.Heightmap;
 import net.minecraft.world.World;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.function.BiFunction;
 import java.util.function.Function;
 
 @Environment(EnvType.CLIENT)
 public class AutoElytraPanic implements ClientModInitializer {
+    public static final String MOD_ID = "autoelytrapanic";
     public static KeyBinding keyToggle;
     public static KeyBinding keyCancel;
 
     public static ModConfig CONFIG;
 
     public static boolean isActive = false;
-
-    static final String MODKEY = "autoelytrapanic";
-    private static final String KEY_PREFIX = "key." + MODKEY + ".";
-    private static final String KEY_CATEG = "category." + MODKEY + ".main";
+    public static boolean hasSentDurabilityMsg = false;
 
     static Style chatStyle = Style.EMPTY.withColor(Formatting.GRAY).withItalic(true);
 
-    static int easeSteps = 5;
+    public static int EASE_STEPS = 5;
     static Float prevYaw = null;
     static Float prevPitch = null;
 
     private static KeyBinding registerKey(String name, int def) {
-        return KeyBindingHelper.registerKeyBinding(new KeyBinding(KEY_PREFIX + name, InputUtil.Type.KEYSYM, def, KEY_CATEG));
+        return KeyBindingHelper.registerKeyBinding(new KeyBinding("key." + MOD_ID + "." + name, InputUtil.Type.KEYSYM, def, "category." + MOD_ID + ".main"));
     }
 
     @Override
@@ -69,12 +63,12 @@ public class AutoElytraPanic implements ClientModInitializer {
             while (keyToggle.wasPressed()) {
                 CONFIG.isEnabled ^= true;
                 AutoConfig.getConfigHolder(ModConfig.class).save();
-                client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MODKEY + "." + (CONFIG.isEnabled ? "enabled" : "disabled")).fillStyle(chatStyle));
+                client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MOD_ID + "." + (CONFIG.isEnabled ? "enabled" : "disabled")).fillStyle(chatStyle));
             }
             while (keyCancel.wasPressed()) {
                 if (isActive) {
                     isActive = false;
-                    client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MODKEY + ".cancelled").fillStyle(chatStyle));
+                    client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MOD_ID + ".cancelled").fillStyle(chatStyle));
                 }
             }
 
@@ -96,7 +90,16 @@ public class AutoElytraPanic implements ClientModInitializer {
         ClientPlayerEntity player = client.player;
         if (player == null || player.isCreative() || player.isSpectator()) return;
         double panicFallDist = Math.max(CONFIG.panicFallDistance, 0.1); // to avoid just always activating when you set a value near zero or less
-        if (!isActive && player.fallDistance >= panicFallDist && !player.isFallFlying()) {
+        if (!isActive && !hasSentDurabilityMsg && player.fallDistance >= panicFallDist && !player.isFallFlying()) {
+            ItemStack itemStack = player.getEquippedStack(EquipmentSlot.CHEST);
+            if (!itemStack.isOf(Items.ELYTRA) || !ElytraItem.isUsable(itemStack)) return;
+
+            if (!CONFIG.ignoreIfDamaged && itemStack.getMaxDamage() - itemStack.getDamage() < 5) {
+                hasSentDurabilityMsg = true;
+                client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MOD_ID + ".elytraDamaged").fillStyle(chatStyle));
+                return;
+            }
+
             BlockHit groundBlock = downwardBlockIterator(player.world, player.getBlockPos(),
                     hit -> !isBlockIgnored(hit.state) && hit.state.getCollisionShape(player.world, hit.pos).isEmpty() // ignore no collision
             );
@@ -104,47 +107,51 @@ public class AutoElytraPanic implements ClientModInitializer {
 
             double groundDist = player.getPos().distanceTo(groundBlock.getPos3d());
 
-            // double minGroundDist = player.fallDistance * 0.75; // 0.75 is the magic number (count 75% of the fall distance to compare to height, avoid waiting for too long)
             double minGroundDist = Math.max(Math.sqrt(player.fallDistance * 10), 10); // the best function I found to compute the min ground distance from fall distance to not take damage
 
             if (groundDist < minGroundDist) {
-                ItemStack itemStack = player.getEquippedStack(EquipmentSlot.CHEST);
-                if (itemStack.isOf(Items.ELYTRA) && ElytraItem.isUsable(itemStack)) {
-                    setActive(true);
-                    client.options.keyJump.setPressed(true);
-                    if (CONFIG.chatMessageOnActivate) {
-                        client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MODKEY + ".onActivate").fillStyle(chatStyle));
-                    }
-                    player.setPitch(CONFIG.flyingPitch);
-                    new Thread(() -> {
-                        try {
-                            Thread.sleep(100);
-                            client.options.keyJump.setPressed(false);
-                        } catch (Exception ignored) {}
-                    }).start();
+                setActive(true);
+                client.options.keyJump.setPressed(true);
+                if (CONFIG.chatMessageOnActivate) {
+                    client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MOD_ID + ".onActivate").fillStyle(chatStyle));
                 }
+                player.setPitch(CONFIG.flyingPitch);
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(100);
+                        client.options.keyJump.setPressed(false);
+                    } catch (Exception ignored) {}
+                }).start();
             }
         }
         else if (isActive) {
-            if (!CONFIG.isEnabled || !player.isFallFlying() || player.isOnGround() || player.isTouchingWater()) setActive(false);
+            if (!CONFIG.isEnabled || canDisable(player)) setActive(false);
             else {
                 player.setPitch(CONFIG.flyingPitch);
-                float yaw = CONFIG.additiveYaw / easeSteps;
-                new Thread(() -> {
+                float yaw = CONFIG.additiveYaw / EASE_STEPS;
+                new Thread(() -> { // maybe this could be done in a better way
                     try {
-                        for (int i = 0; i < easeSteps; i++) {
-                            if (i != 0) Thread.sleep(50 / easeSteps);
+                        for (int i = 0; i < EASE_STEPS; i++) {
+                            if (i != 0) Thread.sleep(50 / EASE_STEPS);
                             player.setYaw(player.getYaw() + yaw);
                         }
                     } catch (Exception ignored) {}
                 }).start();
             }
         }
+        else if (hasSentDurabilityMsg && canDisable(player)) {
+            hasSentDurabilityMsg = false;
+        }
+    }
+
+    public static boolean canDisable(ClientPlayerEntity player) {
+        return !player.isFallFlying() || player.isOnGround() || player.isTouchingWater();
     }
 
     public static void setActive(boolean active) {
         if (isActive == active) return;
         isActive = active;
+        hasSentDurabilityMsg = false;
         ClientPlayerEntity player = MinecraftClient.getInstance().player;
         if (CONFIG.restoreView && player != null) {
             if (active) {
@@ -167,7 +174,7 @@ public class AutoElytraPanic implements ClientModInitializer {
         return new BlockHit(pos, world.getBlockState(pos));
     }
 
-    static class BlockHit {
+    public static class BlockHit {
         BlockPos pos;
         BlockState state;
         public BlockHit(BlockPos pos, BlockState state) {

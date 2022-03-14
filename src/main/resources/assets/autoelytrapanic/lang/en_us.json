@@ -15,8 +15,11 @@
   "text.autoconfig.autoelytrapanic.option.additiveYaw.@Tooltip": "The yaw amount added between each Game Tick to make you spin",
   "text.autoconfig.autoelytrapanic.option.restoreView": "Restore view",
   "text.autoconfig.autoelytrapanic.option.restoreView.@Tooltip": "If you want to restore the Yaw and Pitch before the mod changes it on deactivate",
+  "text.autoconfig.autoelytrapanic.option.ignoreIfDamaged": "Ignore if elytra damaged",
+  "text.autoconfig.autoelytrapanic.option.ignoreIfDamaged.@Tooltip": "If you want to not activate when the durability of your elytra is less than 5.",
   "text.autoconfig.autoelytrapanic.option.chatMessageOnActivate": "Chat message on activate",
   "text.autoconfig.autoelytrapanic.option.chatMessageOnActivate.@Tooltip": "If you want the mod to send a message in the chat when it activates",
   "message.autoelytrapanic.onActivate": "Auto Elytra Panic activated",
-  "message.autoelytrapanic.cancelled": "Auto Elytra Panic cancelled"
+  "message.autoelytrapanic.cancelled": "Auto Elytra Panic cancelled",
+  "message.autoelytrapanic.elytraDamaged": "Auto Elytra Panic cannot activate, your elytra are too damaged."
 }
