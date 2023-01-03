@@ -3,7 +3,7 @@ plugins {
     id 'maven-publish'
 }
 
-version = project.mod_version
+version = "${project.mod_version}+mc${project.minecraft_version}"
 group = project.maven_group
 
 repositories {
@@ -38,6 +38,12 @@ processResources {
 
     filesMatching("fabric.mod.json") {
         expand "version": project.version
+    }
+}
+
+loom {
+    mixin {
+        defaultRefmapName = "${project.archives_base_name}.refmap.json"
     }
 }
 

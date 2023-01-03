@@ -1,7 +1,5 @@
 package fr.loxoz.autoelytrapanic;
 
-import me.shedaniel.autoconfig.AutoConfig;
-import me.shedaniel.autoconfig.serializer.GsonConfigSerializer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -21,82 +19,94 @@ import net.minecraft.item.ElytraItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.text.Style;
-import net.minecraft.text.TranslatableText;
+import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
-import org.lwjgl.glfw.GLFW;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
 @Environment(EnvType.CLIENT)
 public class AutoElytraPanic implements ClientModInitializer {
     public static final String MOD_ID = "autoelytrapanic";
-    public static KeyBinding keyToggle;
-    public static KeyBinding keyCancel;
+    private static final Style chatStyle = Style.EMPTY.withColor(Formatting.GRAY).withItalic(true);
+    private static AutoElytraPanic instance = null;
+    // public static int EASE_STEPS = 5;
 
-    public static ModConfig CONFIG;
-
-    public static boolean isActive = false;
-    public static boolean hasSentDurabilityMsg = false;
-
-    static Style chatStyle = Style.EMPTY.withColor(Formatting.GRAY).withItalic(true);
-
-    public static int EASE_STEPS = 5;
-    static Float prevYaw = null;
-    static Float prevPitch = null;
+    public KeyBinding keyToggle = null;
+    public KeyBinding keyCancel = null;
+    private AEPConfig config = null;
+    private boolean active = false;
+    private boolean msgDurabilitySent = false;
+    private Float restoreYaw = null;
+    private Float restorePitch = null;
+    private Float prevYaw = null;
+    private int jumpTicks = -1;
 
     private static KeyBinding registerKey(String name, int def) {
         return KeyBindingHelper.registerKeyBinding(new KeyBinding("key." + MOD_ID + "." + name, InputUtil.Type.KEYSYM, def, "category." + MOD_ID + ".main"));
     }
 
+    @Contract(pure = true)
+    @Nullable
+    public static AutoElytraPanic inst() { return instance; }
+
+    public AutoElytraPanic() {
+        instance = this;
+    }
+
     @Override
     public void onInitializeClient() {
-        keyToggle = registerKey("toggle", GLFW.GLFW_KEY_KP_6);
-        keyCancel = registerKey("cancel", GLFW.GLFW_KEY_UNKNOWN);
+        keyToggle = registerKey("toggle", InputUtil.GLFW_KEY_KP_6);
+        keyCancel = registerKey("cancel", InputUtil.UNKNOWN_KEY.getCode());
 
-        AutoConfig.register(ModConfig.class, GsonConfigSerializer::new);
-        CONFIG = AutoConfig.getConfigHolder(ModConfig.class).getConfig();
+        config = AEPConfig.init();
 
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (keyToggle.wasPressed()) {
-                CONFIG.isEnabled ^= true;
-                AutoConfig.getConfigHolder(ModConfig.class).save();
-                client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MOD_ID + "." + (CONFIG.isEnabled ? "enabled" : "disabled")).fillStyle(chatStyle));
-            }
-            while (keyCancel.wasPressed()) {
-                if (isActive) {
-                    isActive = false;
-                    client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MOD_ID + ".cancelled").fillStyle(chatStyle));
-                }
-            }
-
-            if (CONFIG.isEnabled) doCheck(client);
-        });
+        ClientTickEvents.END_CLIENT_TICK.register(this::tick);
     }
 
-    @SuppressWarnings("UnnecessaryUnboxing")
-    public static boolean isBlockIgnored(BlockState state) {
-        Block[] blocks = { Blocks.WATER, Blocks.SLIME_BLOCK, Blocks.SEAGRASS, Blocks.KELP, Blocks.KELP_PLANT };
-        for (Block b : blocks) if (state.isOf(b)) return true;
-        Block block = state.getBlock();
-        if (block instanceof SlabBlock && state.get(SlabBlock.WATERLOGGED).booleanValue() && state.get(SlabBlock.TYPE) == SlabType.BOTTOM) return true;
-        // maybe later, check collision shape with waterlogged blocks
-        return false;
+    public AEPConfig getConfig() { return config; }
+    public void setEnabled(boolean enabled) {
+        if (config.enabled == enabled) return;
+        config.enabled = enabled;
+        config.save();
+    }
+    /** short for {@link AEPConfig#enabled} */
+    public boolean isEnabled() { return config.enabled; }
+    public boolean isActive() { return active; }
+
+    private void tick(MinecraftClient client) {
+        while (keyToggle.wasPressed()) {
+            setEnabled(!isEnabled());
+            postMessage(Text.translatable("message." + MOD_ID + "." + (isEnabled() ? "enabled" : "disabled")).fillStyle(chatStyle));
+        }
+        while (keyCancel.wasPressed()) {
+            if (active) {
+                active = false;
+                postMessage(Text.translatable("message." + MOD_ID + ".cancelled").fillStyle(chatStyle));
+            }
+        }
+
+        if (isEnabled()) tickChecker(client);
+        if (jumpTicks >= 0) {
+            jumpTicks --;
+            client.options.jumpKey.setPressed(jumpTicks > 0 && client.player != null);
+        }
     }
 
-    public static void doCheck(MinecraftClient client) {
+    private void tickChecker(MinecraftClient client) {
         ClientPlayerEntity player = client.player;
         if (player == null || player.isCreative() || player.isSpectator()) return;
-        double panicFallDist = Math.max(CONFIG.panicFallDistance, 0.1); // to avoid just always activating when you set a value near zero or less
-        if (!isActive && !hasSentDurabilityMsg && player.fallDistance >= panicFallDist && !player.isFallFlying()) {
+        if (!active && !msgDurabilitySent && player.fallDistance >= config.panicFallDistance && !player.isFallFlying()) {
             ItemStack itemStack = player.getEquippedStack(EquipmentSlot.CHEST);
             if (!itemStack.isOf(Items.ELYTRA) || !ElytraItem.isUsable(itemStack)) return;
 
-            if (!CONFIG.ignoreIfDamaged && itemStack.getMaxDamage() - itemStack.getDamage() < 5) {
-                hasSentDurabilityMsg = true;
-                client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MOD_ID + ".elytraDamaged").fillStyle(chatStyle));
+            if (!config.ignoreIfDamaged && itemStack.getMaxDamage() - itemStack.getDamage() < 5) {
+                msgDurabilitySent = true;
+                postMessage(Text.translatable("message." + MOD_ID + ".elytraDamaged").fillStyle(chatStyle));
                 return;
             }
 
@@ -111,58 +121,80 @@ public class AutoElytraPanic implements ClientModInitializer {
 
             if (groundDist < minGroundDist) {
                 setActive(true);
-                client.options.keyJump.setPressed(true);
-                if (CONFIG.chatMessageOnActivate) {
-                    client.inGameHud.getChatHud().addMessage(new TranslatableText("message." + MOD_ID + ".onActivate").fillStyle(chatStyle));
+                jumpTicks = 2;
+                if (config.messageOnActivate) {
+                    postMessage(Text.translatable("message." + MOD_ID + ".onActivate").fillStyle(chatStyle));
                 }
-                player.setPitch(CONFIG.flyingPitch);
-                new Thread(() -> {
-                    try {
-                        Thread.sleep(100);
-                        client.options.keyJump.setPressed(false);
-                    } catch (Exception ignored) {}
-                }).start();
+                player.setPitch(config.flyingPitch);
             }
         }
-        else if (isActive) {
-            if (!CONFIG.isEnabled || canDisable(player)) setActive(false);
+        else if (active) {
+            if (!isEnabled() || canDisable(player)) setActive(false);
             else {
-                player.setPitch(CONFIG.flyingPitch);
-                float yaw = CONFIG.additiveYaw / EASE_STEPS;
-                new Thread(() -> { // maybe this could be done in a better way
-                    try {
-                        for (int i = 0; i < EASE_STEPS; i++) {
-                            if (i != 0) Thread.sleep(50 / EASE_STEPS);
-                            player.setYaw(player.getYaw() + yaw);
-                        }
-                    } catch (Exception ignored) {}
-                }).start();
+                player.setPitch(config.flyingPitch);
+                if (prevYaw != null) {
+                    player.setYaw(prevYaw + config.yawPerTick);
+                }
+                prevYaw = player.getYaw();
             }
         }
-        else if (hasSentDurabilityMsg && canDisable(player)) {
-            hasSentDurabilityMsg = false;
+        else if (msgDurabilitySent && canDisable(player)) {
+            msgDurabilitySent = false;
         }
+    }
+
+    public void onRenderTick(MinecraftClient client, float tickDelta) {
+        if (active && prevYaw != null && client.player != null) {
+            client.player.setYaw(prevYaw + (config.yawPerTick * tickDelta));
+        }
+    }
+
+    private void postMessage(Text msg) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        switch (config.messageOutputMode) {
+            case CHAT -> client.inGameHud.getChatHud().addMessage(msg);
+            case ACTION_BAR -> client.inGameHud.setOverlayMessage(msg, false);
+        }
+    }
+
+    /**
+     * This method is meant to be used by the mod itself,
+     * warning not to be confused with the enabled property in the config,
+     * see {@link AutoElytraPanic#setEnabled(boolean)}
+     */
+    public void setActive(boolean active) {
+        if (this.active == active) return;
+        this.active = active;
+        msgDurabilitySent = false;
+        ClientPlayerEntity player = MinecraftClient.getInstance().player;
+        if (player == null) return;
+        if (active) {
+            restoreYaw = player.getYaw();
+            restorePitch = player.getPitch();
+        }
+        else {
+            prevYaw = null;
+            if (config.restoreView) {
+                player.setYaw(restoreYaw);
+                player.setPitch(restorePitch);
+            }
+            restoreYaw = null;
+            restorePitch = null;
+        }
+    }
+
+    // helpers
+    public static boolean isBlockIgnored(BlockState state) {
+        Block[] blocks = { Blocks.WATER, Blocks.SLIME_BLOCK, Blocks.SEAGRASS, Blocks.KELP, Blocks.KELP_PLANT };
+        for (Block b : blocks) if (state.isOf(b)) return true;
+        Block block = state.getBlock();
+        if (block instanceof SlabBlock && state.get(SlabBlock.WATERLOGGED) && state.get(SlabBlock.TYPE) == SlabType.BOTTOM) return true;
+        // maybe later, check collision shape with waterlogged blocks
+        return false;
     }
 
     public static boolean canDisable(ClientPlayerEntity player) {
         return !player.isFallFlying() || player.isOnGround() || player.isTouchingWater();
-    }
-
-    public static void setActive(boolean active) {
-        if (isActive == active) return;
-        isActive = active;
-        hasSentDurabilityMsg = false;
-        ClientPlayerEntity player = MinecraftClient.getInstance().player;
-        if (CONFIG.restoreView && player != null) {
-            if (active) {
-                prevYaw = player.getYaw();
-                prevPitch = player.getPitch();
-            }
-            else if (prevYaw != null && prevPitch != null) {
-                player.setYaw(prevYaw);
-                player.setPitch(prevPitch);
-            }
-        }
     }
 
     public static BlockHit downwardBlockIterator(World world, BlockPos startPos, Function<BlockHit, Boolean> skip) {

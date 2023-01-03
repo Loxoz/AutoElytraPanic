@@ -1,9 +1,9 @@
 # Auto Elytra Panic
 
-→ download on [Curseforge](https://www.curseforge.com/minecraft/mc-mods/autoelytrapanic)
+→ download at [Curseforge](https://www.curseforge.com/minecraft/mc-mods/autoelytrapanic)
 
-Will activate elytras and make you spin automagically when you are falling from too high to avoid dying.  
-Only made this thing for fun.
+Will activate your elytra and make you spin when you are falling from a high place to avoid dying.  
+I originally made this mod for fun.
 
 👉🏻 *Requires [**Fabric API**](https://www.curseforge.com/minecraft/mc-mods/fabric-api) and [**Cloth Config**](https://www.curseforge.com/minecraft/mc-mods/cloth-config).*
 
