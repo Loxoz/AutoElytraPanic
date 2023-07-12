@@ -110,8 +110,8 @@ public class AutoElytraPanic implements ClientModInitializer {
                 return;
             }
 
-            BlockHit groundBlock = downwardBlockIterator(player.world, player.getBlockPos(),
-                    hit -> !isBlockIgnored(hit.state) && hit.state.getCollisionShape(player.world, hit.pos).isEmpty() // ignore no collision
+            BlockHit groundBlock = downwardBlockIterator(player.getWorld(), player.getBlockPos(),
+                    hit -> !isBlockIgnored(hit.state) && hit.state.getCollisionShape(player.getWorld(), hit.pos).isEmpty() // ignore no collision
             );
             if (groundBlock == null || isBlockIgnored(groundBlock.state)) return;
 
